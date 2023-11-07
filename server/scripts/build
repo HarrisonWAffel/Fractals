@@ -1,0 +1,1 @@
+docker build -t harrisonwaffel/fractal-backend:latest -f package/Dockerfile .

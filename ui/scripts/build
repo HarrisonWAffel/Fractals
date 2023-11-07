@@ -1,0 +1,3 @@
+#!/bin/bash
+
+docker build -t harrisonwaffel/fractals:latest -f package/Dockerfile .

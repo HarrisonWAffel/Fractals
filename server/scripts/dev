@@ -1,0 +1,5 @@
+set -e
+
+./scripts/build
+
+docker run -p 8989:8989 harrisonwaffel/fractal-backend:latest
