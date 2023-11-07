@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/muesli/gamut"
 	"harrisonwaffel/fractals/pkg/ffmpeg"
 	"harrisonwaffel/fractals/pkg/util"
 	"image"
@@ -47,11 +46,11 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.FrameChu
 		// this allows us to use the full color gradient
 		ConvergeThreshold: 255,
 	}
-	gen.InitPalette(util.DefaultPalette...)
+	gen.Palette = util.InitPalette()
 
 	frameChan := make(chan ffmpeg.FrameChunk)
 	steps := int(math.Ceil(float64(js.TotalRange / js.StepSize)))
-	fmt.Println("intiial steps", steps)
+	fmt.Println("initial steps", steps)
 	adjustedSteps := int(math.Ceil(float64(js.TotalRange/js.StepSize) / 24))
 	fmt.Println("adjusted steps", adjustedSteps)
 
@@ -60,7 +59,8 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.FrameChu
 
 			select {
 			case <-gen.Ctx.Done():
-				fmt.Println("ctx dead")
+				// closing the frameChan kills the
+				// entire pipeline, subsequently stopping ffmpeg
 				close(frameChan)
 				return
 			default:
@@ -113,19 +113,6 @@ type JuliaSetGenerator struct {
 	ConvergeThreshold int
 	// the color Palette we will use when generating frames
 	Palette []color.Color
-}
-
-type Zoom struct {
-	Magnitude    float32
-	Acceleration float32
-}
-
-func (j *JuliaSetGenerator) InitPalette(colors ...string) {
-	var cp []color.Color
-	for i := 0; i < len(colors)-1; i++ {
-		cp = append(cp, gamut.Blends(gamut.Hex(colors[i]), gamut.Hex(colors[i+1]), int(util.MapToRangeEnd)/(len(colors)-1)+1)...)
-	}
-	j.Palette = cp
 }
 
 func (j *JuliaSetGenerator) CreateFrame(fwidth, fheight int) *image.RGBA {

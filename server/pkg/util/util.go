@@ -1,6 +1,8 @@
 package util
 
 import (
+	"github.com/muesli/gamut"
+	"image/color"
 	"math"
 )
 
@@ -19,4 +21,13 @@ func MapToRange(input float32) int {
 
 	slope := 1.0 * (outputEnd - outputStart) / (inputEnd - inputStart)
 	return int(outputStart + math.Round(slope*(float64(input)-inputStart)))
+}
+
+func InitPalette() []color.Color {
+	var cp []color.Color
+	colors := DefaultPalette
+	for i := 0; i < len(colors)-1; i++ {
+		cp = append(cp, gamut.Blends(gamut.Hex(colors[i]), gamut.Hex(colors[i+1]), int(MapToRangeEnd)/(len(colors)-1)+1)...)
+	}
+	return cp
 }

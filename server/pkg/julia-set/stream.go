@@ -1,7 +1,6 @@
 package julia_set
 
 import (
-	"fmt"
 	"harrisonwaffel/fractals/pkg/ffmpeg"
 	"io"
 	"net/http"
@@ -46,6 +45,6 @@ func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, w http.Response
 		return err
 	default:
 	}
-	fmt.Println("ret")
+
 	return nil
 }
