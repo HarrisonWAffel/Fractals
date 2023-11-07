@@ -8,6 +8,7 @@ import (
 )
 
 type Processor struct {
+	TimeoutInSeconds int
 }
 
 type Frame struct {
@@ -39,20 +40,7 @@ func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 		julia-set-generator -> frameChan -> ffmpeg frameChan reader pipe -> ffmpeg -> frame output pipe writer -> frame output pipe reader -> whatever needs to read frames
 	*/
 
-	pr, pw := io.Pipe()
-	go func(frameChan chan FrameChunk, pw *io.PipeWriter) {
-		for {
-			select {
-			case frameChunk, open := <-frameChan:
-				if !open {
-					pw.Close()
-					return
-				}
-
-				pw.Write(frameChunk.ToByteArray())
-			}
-		}
-	}(frameChan, pw)
+	pr := p.GetChunkReader(frameChan)
 
 	frameReader, frameWriter := io.Pipe()
 	go func(frameReader *io.PipeReader, frameOutputWriter *io.PipeWriter) {

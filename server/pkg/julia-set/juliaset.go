@@ -45,7 +45,7 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.FrameChu
 		MoveY:             moveY,
 		// we use 255 since RGBA has at most 255 values,
 		// this allows us to use the full color gradient
-		ConvergeThreshold: 175,
+		ConvergeThreshold: 255,
 	}
 	gen.InitPalette(util.DefaultPalette...)
 
@@ -115,6 +115,11 @@ type JuliaSetGenerator struct {
 	Palette []color.Color
 }
 
+type Zoom struct {
+	Magnitude    float32
+	Acceleration float32
+}
+
 func (j *JuliaSetGenerator) InitPalette(colors ...string) {
 	var cp []color.Color
 	for i := 0; i < len(colors)-1; i++ {
@@ -124,8 +129,8 @@ func (j *JuliaSetGenerator) InitPalette(colors ...string) {
 }
 
 func (j *JuliaSetGenerator) CreateFrame(fwidth, fheight int) *image.RGBA {
-	var newReal, newImaginary, oldReal, oldImaginary float32
-	maxIterations := 255 // 255 for RGB
+	var newReal, newImaginary float32
+
 	myImg := image.NewRGBA(image.Rect(0, 0, fwidth, fheight))
 	height := float32(myImg.Bounds().Size().Y)
 	width := float32(myImg.Bounds().Size().X)
@@ -139,23 +144,31 @@ func (j *JuliaSetGenerator) CreateFrame(fwidth, fheight int) *image.RGBA {
 			newReal = 1.5 * (float32(k) - halfWidth) / newRealpt2
 			newImaginary = (float32(i) - halfHeight) / newImgpt2
 
-			iterations := 0
-			for ; iterations < maxIterations; iterations++ {
-				oldReal = newReal
-				oldImaginary = newImaginary
-				// z is a complex number described by newReal and newImaginary
-				// a+bi where a = newReal, b = newImaginary
-
-				// note: math.Pow is much slower than the below statements
-				newReal = oldReal*oldReal - oldImaginary*oldImaginary + j.ConstantReal
-				newImaginary = 2*oldReal*oldImaginary + j.ConstantImaginary
-				if (newReal*newReal + newImaginary*newImaginary) > 2 {
-					break
-				}
-			}
+			iterations := IteratePixel(j.ConvergeThreshold, newReal, newImaginary, j.ConstantReal, j.ConstantImaginary)
 			myImg.Set(i, k, j.Palette[util.MapToRange(float32(iterations))])
 		}
 	}
 
 	return myImg
+}
+
+func IteratePixel(maxIterations int, initReal, initImaginary, constantReal, constantImaginary float32) int {
+	var oldReal, oldImaginary float32
+	iterations := 0
+	newReal := initReal
+	newImaginary := initImaginary
+	for ; iterations < maxIterations; iterations++ {
+		oldReal = newReal
+		oldImaginary = newImaginary
+		// z is a complex number described by newReal and newImaginary
+		// a+bi where a = newReal, b = newImaginary
+
+		// note: math.Pow is much slower than the below statements
+		newReal = oldReal*oldReal - oldImaginary*oldImaginary + constantReal
+		newImaginary = 2*oldReal*oldImaginary + constantImaginary
+		if (newReal*newReal + newImaginary*newImaginary) > 2 {
+			break
+		}
+	}
+	return iterations
 }
