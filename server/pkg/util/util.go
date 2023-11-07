@@ -4,6 +4,8 @@ import (
 	"math"
 )
 
+const MapToRangeEnd = 128.
+
 // DefaultPalette is the default color gradient to use when generating frames
 var DefaultPalette = []string{"#000764", "#206acb", "#edffff", "#ffaa00", "#0002000"}
 
@@ -13,7 +15,7 @@ func MapToRange(input float32) int {
 	inputStart := 0.
 	inputEnd := 255.
 	outputStart := 0.
-	outputEnd := 128.
+	outputEnd := MapToRangeEnd
 
 	slope := 1.0 * (outputEnd - outputStart) / (inputEnd - inputStart)
 	return int(outputStart + math.Round(slope*(float64(input)-inputStart)))

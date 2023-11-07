@@ -1,48 +1,65 @@
 package ffmpeg
 
 import (
-	"bytes"
 	"fmt"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
-	"image"
-	"image/png"
 	"io"
 )
 
 type Processor struct {
 }
 
-func (p *Processor) CreateVideo(frames []*image.RGBA, writeCloser io.WriteCloser) error {
+type Frame struct {
+	Index int
+	Frame []byte
+}
 
-	videoBuffer := bytes.Buffer{}
+type FrameChunk struct {
+	Index  int
+	Frames []Frame
+}
 
-	// todo; if we are going to stream it we need to
-	// 	use an open ended byte provider, not just a buffer that can run dry
-	for _, frame := range frames {
-		frameBuff := new(bytes.Buffer)
-		err := png.Encode(frameBuff, frame)
-		if err != nil {
-			return fmt.Errorf("encountered error converting frame to png: %v", err)
+func (p *Processor) CreateVideo(frameChan chan Frame) *io.PipeReader {
+
+	/*
+		pipes!
+		julia-set-generator -> frameChan -> ffmpeg frameChan reader pipe -> ffmpeg -> frame output pipe writer -> frame output pipe reader -> whatever needs to read frames
+	*/
+
+	pr, pw := io.Pipe()
+	go func(frameChan chan Frame, pw *io.PipeWriter) {
+		for {
+			select {
+			case frame, open := <-frameChan:
+				if !open {
+					pw.Close()
+					return
+				}
+				pw.Write(frame.Frame)
+			}
 		}
-		videoBuffer.Write(frameBuff.Bytes())
-	}
+	}(frameChan, pw)
 
-	// jpeg is 24.8 mb png is 21.3
-
-	// need to feed encoded png frames into here
-	err := ffmpeg.Input("pipe:").
-		WithInput(bytes.NewReader(videoBuffer.Bytes())).
-		Output("pipe:", ffmpeg.KwArgs{
-			"c:v":     "libx264",
-			"pix_fmt": "yuv420p",
-			"f":       "ismv",
+	frameReader, frameWriter := io.Pipe()
+	go func(frameReader *io.PipeReader, frameOutputWriter *io.PipeWriter) {
+		ffmpeg.Input("pipe:", ffmpeg.KwArgs{
+			"flush_packets": "1",
 		}).
-		WithOutput(writeCloser).
-		ErrorToStdOut().
-		Run()
-	if err != nil {
-		return err
-	}
+			WithInput(pr).
+			Output("pipe:", ffmpeg.KwArgs{
+				"flush_packets":        "1",
+				"probesize":            "200000",
+				"max_interleave_delta": "1000000",
+				"c:v":                  "libx264",
+				"pix_fmt":              "yuv420p",
+				"f":                    "ismv",
+			}).
+			WithOutput(frameWriter, frameWriter).
+			ErrorToStdOut().
+			Run()
+		frameWriter.Close()
+		fmt.Println("ffmpeg is done")
+	}(pr, frameWriter)
 
-	return writeCloser.Close()
+	return frameReader
 }

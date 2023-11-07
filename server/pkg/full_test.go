@@ -2,13 +2,9 @@ package pkg
 
 import (
 	"bytes"
-	"fmt"
-	"harrisonwaffel/fractals/pkg/ffmpeg"
 	julia_set "harrisonwaffel/fractals/pkg/julia-set"
-	"io"
 	"os"
 	"testing"
-	"time"
 )
 
 func TestIt(t *testing.T) {
@@ -18,32 +14,15 @@ func TestIt(t *testing.T) {
 		ConstantImaginary:   0.156,
 		TotalRange:          0.0012,
 		StepSize:            0.00001,
-		VideoHeight:         1600,
-		VideoWidth:          1600,
+		VideoHeight:         1200,
+		VideoWidth:          1200,
 	}
 
-	// todo; this part needs to become stream'd tomorrow
-	frames := js.GenerateSet(0, 0, 2.5)
-
-	p := ffmpeg.Processor{}
-	pr1, pw1 := io.Pipe()
 	b := new(bytes.Buffer)
-	go func() {
-		for {
-			n, err := io.Copy(b, pr1)
-			if err != nil {
-				panic(err)
-			}
-			if n == 0 {
-				return
-			}
-
-		}
-	}()
-
-	time.Sleep(250 * time.Millisecond)
-	if err := p.CreateVideo(frames, pw1); err != nil {
-		panic(fmt.Sprintf("%v", err))
+	err := js.StreamFuncOutput(0., 0., 1.0, b)
+	if err != nil {
+		t.Log(err)
+		t.Fail()
 	}
 	os.WriteFile("test.mp4", b.Bytes(), os.ModePerm)
 }

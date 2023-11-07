@@ -1,13 +1,14 @@
 package julia_set
 
 import (
-	"fmt"
+	"bytes"
 	"github.com/muesli/gamut"
+	"harrisonwaffel/fractals/pkg/ffmpeg"
 	"harrisonwaffel/fractals/pkg/util"
 	"image"
 	"image/color"
+	"image/png"
 	"math"
-	"sync"
 )
 
 // we generate a video of the julia set by
@@ -26,7 +27,7 @@ type JuliaSet struct {
 	VideoWidth  int
 }
 
-func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) []*image.RGBA {
+func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.Frame {
 
 	if zoom == 0. {
 		zoom = 1.0
@@ -42,29 +43,27 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) []*image.RGBA {
 		// this allows us to use the full color gradient
 		ConvergeThreshold: 255,
 	}
-
 	gen.InitPalette(util.DefaultPalette...)
 
-	frames := make([]*image.RGBA, int(math.Ceil(float64(js.TotalRange/js.StepSize))))
-	// By incrementing the constant real we effectively iterate through time.
-	// Controlling the step size controls the speed at which we move through time.
-	// The total amount of time is determined by the js.TotalRange,
-	fmt.Println(fmt.Sprintf("%v", math.Ceil(float64(js.TotalRange/js.StepSize))))
-	wg := sync.WaitGroup{}
+	frameChan := make(chan ffmpeg.Frame)
 
-	// todo; handle the speed problem. if we want to stream it we likely need to chunk it
-	for i := 0; i < int(math.Ceil(float64(js.TotalRange/js.StepSize))); i++ {
-		go func(i int, frames []*image.RGBA, gen JuliaSetGenerator) {
-			wg.Add(1)
-			frames[i] = gen.CreateFrame(js.VideoWidth, js.VideoHeight)
-			wg.Done()
-		}(i, frames, *gen)
-		gen.ConstantReal += js.StepSize
-		// increment the set (go forward in time)
-		fmt.Println(gen.ConstantReal)
-	}
-	wg.Wait()
-	return frames
+	go func(gen *JuliaSetGenerator, frameChan chan ffmpeg.Frame) {
+		frameBuff := new(bytes.Buffer)
+		for i := 0; i < int(math.Ceil(float64(js.TotalRange/js.StepSize))); i++ {
+			png.Encode(frameBuff, gen.CreateFrame(js.VideoWidth, js.VideoHeight))
+			frame := ffmpeg.Frame{
+				Index: i,
+				Frame: frameBuff.Bytes(),
+			}
+			frameChan <- frame
+			frameBuff.Reset()
+			// increment the set (go forward in time)
+			gen.ConstantReal += js.StepSize
+		}
+		close(frameChan)
+	}(gen, frameChan)
+
+	return frameChan
 }
 
 type JuliaSetGenerator struct {
@@ -86,7 +85,7 @@ type JuliaSetGenerator struct {
 func (j *JuliaSetGenerator) InitPalette(colors ...string) {
 	var cp []color.Color
 	for i := 0; i < len(colors)-1; i++ {
-		cp = append(cp, gamut.Blends(gamut.Hex(colors[i]), gamut.Hex(colors[i+1]), 128/(len(colors)-1)+1)...)
+		cp = append(cp, gamut.Blends(gamut.Hex(colors[i]), gamut.Hex(colors[i+1]), int(util.MapToRangeEnd)/(len(colors)-1)+1)...)
 	}
 	j.Palette = cp
 }
