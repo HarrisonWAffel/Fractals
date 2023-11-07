@@ -1,14 +1,15 @@
 package julia_set
 
 import (
-	"github.com/gorilla/websocket"
+	"fmt"
 	"harrisonwaffel/fractals/pkg/ffmpeg"
+	"net/http"
 
 	"io"
 	"sync"
 )
 
-func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, conn *websocket.Conn) error {
+func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, w http.ResponseWriter) error {
 	frameChan := js.GenerateSet(moveX, moveY, zoom)
 	ffmpegProcessor := ffmpeg.Processor{}
 	frameOutput := ffmpegProcessor.CreateVideo(frameChan)
@@ -16,33 +17,23 @@ func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, conn *websocket
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	errChan := make(chan error)
-	go func(frameOutput *io.PipeReader, conn *websocket.Conn, errChan chan error) {
+	go func(frameOutput *io.PipeReader, w http.ResponseWriter, errChan chan error) {
 		for {
-			newWriter, err := conn.NextWriter(websocket.BinaryMessage)
-			b := make([]byte, 4096)
-			if err != nil {
-				panic(err)
-			}
-
-			n, err := frameOutput.Read(b)
+			n, err := io.Copy(w, frameOutput)
 			if err != nil {
 				// this err could also be an EOF
 				errChan <- err
 				wg.Done()
 				close(errChan)
-				newWriter.Close()
 				return
 			}
 			if n == 0 {
 				wg.Done()
 				close(errChan)
-				newWriter.Close()
 				return
 			}
-			newWriter.Write(b)
-			newWriter.Close()
 		}
-	}(frameOutput, conn, errChan)
+	}(frameOutput, w, errChan)
 	wg.Wait()
 
 	select {
@@ -53,5 +44,6 @@ func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, conn *websocket
 		return err
 	default:
 	}
+	fmt.Println("ret")
 	return nil
 }

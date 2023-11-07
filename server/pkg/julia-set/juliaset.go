@@ -2,6 +2,8 @@ package julia_set
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"github.com/muesli/gamut"
 	"harrisonwaffel/fractals/pkg/ffmpeg"
 	"harrisonwaffel/fractals/pkg/util"
@@ -9,6 +11,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"sync"
 )
 
 // we generate a video of the julia set by
@@ -16,6 +19,7 @@ import (
 // by StepSize until we reach InitialConstantReal + TotalRange
 
 type JuliaSet struct {
+	Ctx                 context.Context
 	InitialConstantReal float32
 	ConstantImaginary   float32
 	TotalRange          float32
@@ -27,13 +31,13 @@ type JuliaSet struct {
 	VideoWidth  int
 }
 
-func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.Frame {
-
+func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.FrameChunk {
 	if zoom == 0. {
 		zoom = 1.0
 	}
 
 	gen := &JuliaSetGenerator{
+		Ctx:               js.Ctx,
 		ConstantReal:      js.InitialConstantReal,
 		ConstantImaginary: js.ConstantImaginary,
 		Zoom:              zoom,
@@ -41,25 +45,53 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.Frame {
 		MoveY:             moveY,
 		// we use 255 since RGBA has at most 255 values,
 		// this allows us to use the full color gradient
-		ConvergeThreshold: 255,
+		ConvergeThreshold: 175,
 	}
 	gen.InitPalette(util.DefaultPalette...)
 
-	frameChan := make(chan ffmpeg.Frame)
+	frameChan := make(chan ffmpeg.FrameChunk)
+	steps := int(math.Ceil(float64(js.TotalRange / js.StepSize)))
+	fmt.Println("intiial steps", steps)
+	adjustedSteps := int(math.Ceil(float64(js.TotalRange/js.StepSize) / 24))
+	fmt.Println("adjusted steps", adjustedSteps)
 
-	go func(gen *JuliaSetGenerator, frameChan chan ffmpeg.Frame) {
-		frameBuff := new(bytes.Buffer)
-		for i := 0; i < int(math.Ceil(float64(js.TotalRange/js.StepSize))); i++ {
-			png.Encode(frameBuff, gen.CreateFrame(js.VideoWidth, js.VideoHeight))
-			frame := ffmpeg.Frame{
-				Index: i,
-				Frame: frameBuff.Bytes(),
+	go func(gen *JuliaSetGenerator, frameChan chan ffmpeg.FrameChunk) {
+		for i := 0; i < int(math.Ceil(float64(js.TotalRange/js.StepSize)/24)); i++ {
+
+			select {
+			case <-gen.Ctx.Done():
+				fmt.Println("ctx dead")
+				close(frameChan)
+				return
+			default:
 			}
-			frameChan <- frame
-			frameBuff.Reset()
-			// increment the set (go forward in time)
-			gen.ConstantReal += js.StepSize
+
+			wg := sync.WaitGroup{}
+			chunk := ffmpeg.FrameChunk{
+				Frames: make([]ffmpeg.Frame, ffmpeg.FPS+1),
+			}
+
+			// Concurrently process as many frames per second as we want
+			for j := 1; j <= ffmpeg.FPS; j++ {
+				wg.Add(1)
+				go func(wg *sync.WaitGroup, chunk *ffmpeg.FrameChunk, gen JuliaSetGenerator, index, frameIndex int) {
+					frameBuff := new(bytes.Buffer)
+					png.Encode(frameBuff, gen.CreateFrame(js.VideoWidth, js.VideoHeight))
+					chunk.Frames[index] = ffmpeg.Frame{
+						Index: index,
+						Frame: frameBuff.Bytes(),
+					}
+					wg.Done()
+				}(&wg, &chunk, *gen, j, j*i)
+
+				// increment the set (go forward in time)
+				gen.ConstantReal += js.StepSize
+			}
+			wg.Wait()
+
+			frameChan <- chunk
 		}
+
 		close(frameChan)
 	}(gen, frameChan)
 
@@ -67,6 +99,7 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.Frame {
 }
 
 type JuliaSetGenerator struct {
+	Ctx               context.Context
 	ConstantReal      float32
 	ConstantImaginary float32
 	// zoom into the center of the frame

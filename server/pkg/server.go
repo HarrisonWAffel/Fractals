@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/websocket"
 	julia_set "harrisonwaffel/fractals/pkg/julia-set"
 	"net/http"
-	"sync"
 )
 
 var upgrader = websocket.Upgrader{
@@ -21,50 +20,24 @@ var upgrader = websocket.Upgrader{
 func StartServer() error {
 	e := gin.Default()
 
-	e.GET("/fractal", func(context *gin.Context) {
-		conn, err := upgrader.Upgrade(context.Writer, context.Request, nil)
+	e.GET("/fractal.mp4", func(context *gin.Context) {
+
+		js := julia_set.JuliaSet{
+			Ctx:                 context.Request.Context(),
+			InitialConstantReal: 0.280,
+			ConstantImaginary:   0.01,
+			TotalRange:          0.005,
+			StepSize:            0.00001,
+			VideoHeight:         1000,
+			VideoWidth:          1000,
+		}
+
+		err := js.StreamFuncOutput(0.0, 0.0, 1, context.Writer)
 		if err != nil {
-			fmt.Printf("bad upgrade: %v\n", err)
+			context.Status(http.StatusInternalServerError)
 			return
 		}
-		defer conn.Close()
-
-		mux := sync.Mutex{}
-
-		for {
-			_, m, err := conn.ReadMessage()
-			if err != nil {
-				fmt.Println(err)
-				break
-			}
-			locked := mux.TryLock()
-			if !locked {
-				continue
-			}
-			switch string(m) {
-			case "julia-set":
-				fmt.Println("beginning to generate a julia set")
-				js := julia_set.JuliaSet{
-					InitialConstantReal: -0.8,
-					ConstantImaginary:   0.156,
-					TotalRange:          0.0012,
-					StepSize:            0.000001,
-					VideoHeight:         800,
-					VideoWidth:          800,
-				}
-
-				err = js.StreamFuncOutput(0.0, 0.0, 1.0, conn)
-				if err != nil {
-					context.Status(http.StatusInternalServerError)
-					return
-				}
-
-			default:
-				fmt.Println("invalid fractal name ", string(m))
-			}
-			mux.Unlock()
-		}
-		fmt.Println("conn was closed")
+		fmt.Println("done")
 	})
 
 	return e.Run(":8989")
