@@ -29,7 +29,7 @@ func (fc *FrameChunk) ToByteArray() []byte {
 	return chunkBuff.Bytes()
 }
 
-const FPS = 30
+const FPS = 60
 
 func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 
@@ -40,12 +40,16 @@ func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 
 	pr := p.GetChunkReader(frameChan)
 
+	// ffmpeg flags should be updated at some point,
+	// resulting artifacts using this encoder of flags is very large
 	frameReader, frameWriter := io.Pipe()
 	go func(frameReader *io.PipeReader, frameOutputWriter *io.PipeWriter) {
 		ffmpeg.Input("pipe:").
 			WithInput(pr).
 			Output("pipe:", ffmpeg.KwArgs{
 				"c:v":     "libx264",
+				"crf":     "20",
+				"preset":  "veryfast",
 				"pix_fmt": "yuv420p",
 				"f":       "ismv",
 			}).

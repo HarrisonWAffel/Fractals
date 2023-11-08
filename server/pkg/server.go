@@ -40,6 +40,8 @@ func StartServer() error {
 		// move y 9.5
 		// zoom 1000
 
+		// 529 ms vs 647, so a little better
+
 		img := mandelBrot.GenerateImage(mandelBrot.Zoom)
 
 		frameBuff := new(bytes.Buffer)
@@ -53,6 +55,8 @@ func StartServer() error {
 			"movex",
 			"movey",
 			"zoom",
+			"zoom-step",
+			"seconds",
 		}
 
 		output := getFloat64QueryParams(values, context)
@@ -62,8 +66,9 @@ func StartServer() error {
 			ImageHeight:      1000,
 			MoveX:            output[0],
 			MoveY:            output[1],
-			ZoomStepSize:     5,
-			Zoom:             output[2],
+			ZoomStepSize:     output[2],
+			Zoom:             output[3],
+			Duration:         int(output[4]),
 			ImageWidth:       1000,
 			ConvergenceLimit: 255,
 		}

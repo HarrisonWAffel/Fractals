@@ -1,6 +1,7 @@
 package ffmpeg
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"sync"
@@ -14,7 +15,8 @@ func (p *Processor) StreamFuncOutput(frameChan chan FrameChunk, w http.ResponseW
 	errChan := make(chan error)
 	go func(frameOutput *io.PipeReader, w http.ResponseWriter, errChan chan error) {
 		for {
-			n, err := io.Copy(w, frameOutput)
+			b := new(bytes.Buffer)
+			n, err := io.Copy(b, frameOutput)
 			if err != nil {
 				// this err could also be an EOF
 				errChan <- err

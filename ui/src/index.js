@@ -13,6 +13,7 @@ import Mandelbrot from "./routes/mandelbrot";
 
 import reportWebVitals from './reportWebVitals';
 import 'bootstrap/dist/css/bootstrap.css';
+import MandelbrotVideo from "./routes/mandelbrot-video";
 
 
 const router = createBrowserRouter([
@@ -29,6 +30,11 @@ const router = createBrowserRouter([
     {
         path: "/mandelbrot",
         element: <Mandelbrot />,
+        errorElement: <ErrorPage/>
+    },
+    {
+        path: "/mandelbrot-video",
+        element: <MandelbrotVideo/>,
         errorElement: <ErrorPage/>
     }
 ]);

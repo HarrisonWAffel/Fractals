@@ -7,9 +7,9 @@ import {useState} from "react";
 export default function Mandelbrot() {
 
 
-    const [moveX, setMoveX] = useState("20500")
-    const [moveY, setMoveY] = useState("2750")
-    const [zoom, setZoom] = useState("125")
+    const [moveX, setMoveX] = useState("148.5")
+    const [moveY, setMoveY] = useState("9.5")
+    const [zoom, setZoom] = useState("1000")
 
 
     const [url, setUrl] = useState("")
@@ -51,7 +51,8 @@ export default function Mandelbrot() {
                             aria-describedby="basic-addon1"
                         />
                     </InputGroup>
-                    <Button onClick={()=>{updateUrl()}} variant="primary">Update Mandelbrot Set</Button>
+                    <Button onClick={()=>{updateUrl()}} variant="primary">Preview Mandelbrot Set</Button>
+                    <Button onClick={()=>{}} variant="primary">Download Mandelbrot Set</Button>
                 </Card.Body>
             </Card>
             <img key={url} style={{marginTop: "2.5%"}} src={url}/>

@@ -9,6 +9,7 @@ export default function Header() {
                     <NavDropdown title="Available Fractals" id="basic-nav-dropdown">
                         <NavDropdown.Item href={`/julia-set`}>Julia Sets</NavDropdown.Item>
                         <NavDropdown.Item href={`/mandelbrot`}>Mandelbrot</NavDropdown.Item>
+                        <NavDropdown.Item href={`/mandelbrot-video`}>Mandelbrot Animation</NavDropdown.Item>
                     </NavDropdown>
                 </Nav>
             </Navbar.Collapse>
