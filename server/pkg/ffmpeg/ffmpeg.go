@@ -12,12 +12,10 @@ type Processor struct {
 }
 
 type Frame struct {
-	Index int
 	Frame []byte
 }
 
 type FrameChunk struct {
-	Index  int
 	Frames []Frame
 }
 
@@ -37,7 +35,7 @@ func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 
 	/*
 		pipes!
-		julia-set-generator -> frameChan -> ffmpeg frameChan reader pipe -> ffmpeg -> frame output pipe writer -> frame output pipe reader -> whatever needs to read frames
+		generator -> frameChan -> ffmpeg frameChan reader pipe -> ffmpeg -> frame output pipe writer -> frame output pipe reader -> whatever needs to read frames
 	*/
 
 	pr := p.GetChunkReader(frameChan)

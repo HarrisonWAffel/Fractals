@@ -1,19 +1,13 @@
-package julia_set
+package ffmpeg
 
 import (
-	"harrisonwaffel/fractals/pkg/ffmpeg"
 	"io"
 	"net/http"
 	"sync"
 )
 
-func (js *JuliaSet) StreamFuncOutput(moveX, moveY, zoom float32, w http.ResponseWriter) error {
-	frameChan := js.GenerateSet(moveX, moveY, zoom)
-	ffmpegProcessor := ffmpeg.Processor{
-		TimeoutInSeconds: 5,
-	}
-
-	frameOutput := ffmpegProcessor.CreateVideo(frameChan)
+func (p *Processor) StreamFuncOutput(frameChan chan FrameChunk, w http.ResponseWriter) error {
+	frameOutput := p.CreateVideo(frameChan)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

@@ -7,9 +7,9 @@ import {useState} from "react";
 export default function Mandelbrot() {
 
 
-    const [moveX, setMoveX] = useState("0")
-    const [moveY, setMoveY] = useState("0")
-    const [zoom, setZoom] = useState("1.0")
+    const [moveX, setMoveX] = useState("20500")
+    const [moveY, setMoveY] = useState("2750")
+    const [zoom, setZoom] = useState("125")
 
 
     const [url, setUrl] = useState("")

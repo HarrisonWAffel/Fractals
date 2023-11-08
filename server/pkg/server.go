@@ -1,127 +1,148 @@
 package pkg
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/gorilla/websocket"
+	"harrisonwaffel/fractals/pkg/ffmpeg"
 	julia_set "harrisonwaffel/fractals/pkg/julia-set"
 	mandelbrot_set "harrisonwaffel/fractals/pkg/mandelbrot-set"
-	"net/http"
+	"harrisonwaffel/fractals/pkg/util"
+	"image/png"
 	"strconv"
 )
-
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  2048,
-	WriteBufferSize: 2048,
-	// ignore the origin of the request
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
 
 func StartServer() error {
 	e := gin.Default()
 
 	e.GET("/mandelbrot.png", func(context *gin.Context) {
-		moveX := context.Query("movex")
-		moveY := context.Query("movey")
-		zoom := context.Query("zoom")
+		values := []string{
+			"movex",
+			"movey",
+			"zoom",
+		}
 
-		moveXFloat, err := strconv.ParseFloat(moveX, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
-		moveYFloat, err := strconv.ParseFloat(moveY, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
-		zoomFloat, err := strconv.ParseFloat(zoom, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
+		output := getFloat64QueryParams(values, context)
 
 		mandelBrot := mandelbrot_set.MandelbrotGenerator{
 			Ctx:              context.Request.Context(),
 			ImageHeight:      1000,
-			MoveX:            float32(moveXFloat),
-			MoveY:            float32(moveYFloat),
-			Zoom:             float32(zoomFloat),
+			MoveX:            output[0],
+			MoveY:            output[1],
+			Zoom:             output[2],
 			ImageWidth:       1000,
 			ConvergenceLimit: 255,
 		}
+		mandelBrot.Palette = util.InitPalette()
 
 		// a cool one is
-		// move X 20500
-		// move y 2750
-		// zoom 125
+		// move X 148.5
+		// move y 9.5
+		// zoom 1000
 
-		img, err := mandelBrot.GenerateImage()
-		if err != nil {
-			context.Status(http.StatusInternalServerError)
-			return
+		img := mandelBrot.GenerateImage(mandelBrot.Zoom)
+
+		frameBuff := new(bytes.Buffer)
+		png.Encode(frameBuff, img)
+
+		context.Writer.Write(frameBuff.Bytes())
+	})
+
+	e.GET("/mandelbrot.mp4", func(context *gin.Context) {
+		values := []string{
+			"movex",
+			"movey",
+			"zoom",
 		}
 
-		context.Writer.Write(img)
+		output := getFloat64QueryParams(values, context)
+
+		mandelBrot := mandelbrot_set.MandelbrotGenerator{
+			Ctx:              context.Request.Context(),
+			ImageHeight:      1000,
+			MoveX:            output[0],
+			MoveY:            output[1],
+			ZoomStepSize:     5,
+			Zoom:             output[2],
+			ImageWidth:       1000,
+			ConvergenceLimit: 255,
+		}
+		mandelBrot.Palette = util.InitPalette()
+
+		// a cool one is
+		// move X 148.5
+		// move y 9.5
+		// zoom 1000
+
+		p := ffmpeg.Processor{}
+
+		frameChan := mandelBrot.GenerateZoomVideo()
+		if err := p.StreamFuncOutput(frameChan, context.Writer); err != nil {
+			fmt.Printf("err %v\n", err)
+		}
 	})
 
 	e.GET("/julia-set.mp4", func(context *gin.Context) {
 
-		cReal := context.Query("constant-real")
-		cImaginary := context.Query("constant-imaginary")
-		totalRange := context.Query("total-range")
-		stepSize := context.Query("step-size")
-		zoom := context.Query("zoom")
-
-		cRealFloat, err := strconv.ParseFloat(cReal, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
+		querys := []string{
+			"constant-real",
+			"constant-imaginary",
+			"total-range",
+			"step-size",
+			"zoom",
 		}
-
-		cImaginaryFloat, err := strconv.ParseFloat(cImaginary, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
-
-		totalRangeFloat, err := strconv.ParseFloat(totalRange, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
-
-		stepSizeFloat, err := strconv.ParseFloat(stepSize, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
-
-		zoomFloat, err := strconv.ParseFloat(zoom, 64)
-		if err != nil {
-			context.Status(http.StatusBadRequest)
-			return
-		}
+		values := getFloat32QueryParams(querys, context)
 
 		js := julia_set.JuliaSet{
 			Ctx:                 context.Request.Context(),
-			InitialConstantReal: float32(cRealFloat),
-			ConstantImaginary:   float32(cImaginaryFloat),
-			TotalRange:          float32(totalRangeFloat),
-			StepSize:            float32(stepSizeFloat),
+			InitialConstantReal: values[0],
+			ConstantImaginary:   values[1],
+			TotalRange:          values[2],
+			StepSize:            values[3],
 			VideoHeight:         1000,
 			VideoWidth:          1000,
 		}
 
-		err = js.StreamFuncOutput(0.0, 0.0, float32(zoomFloat), context.Writer)
+		ffmpegProcessor := ffmpeg.Processor{}
+
+		frameChan := js.GenerateSet(0.0, 0.0, values[4])
+
+		err := ffmpegProcessor.StreamFuncOutput(frameChan, context.Writer)
 		if err != nil {
-			context.Status(http.StatusInternalServerError)
-			return
+			fmt.Print("julia set err: %v\n", err)
 		}
+
 		fmt.Println("done")
 	})
 
 	return e.Run(":8989")
+}
+
+func getFloat64QueryParams(params []string, ctx *gin.Context) []float64 {
+	var output []float64
+	for _, e := range params {
+		v := ctx.Query(e)
+		if v == "" {
+			output = append(output, 0.0)
+		}
+		out, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
+		}
+		output = append(output, out)
+	}
+	return output
+}
+
+func getFloat32QueryParams(params []string, ctx *gin.Context) []float32 {
+	var output []float32
+	for _, e := range params {
+		v := ctx.Query(e)
+		if v == "" {
+			output = append(output, 0.0)
+		}
+		out, _ := strconv.ParseFloat(v, 64)
+		output = append(output, float32(out))
+	}
+	return output
 }

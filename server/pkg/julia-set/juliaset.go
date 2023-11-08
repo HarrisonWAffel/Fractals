@@ -74,15 +74,14 @@ func (js *JuliaSet) GenerateSet(moveX, moveY, zoom float32) chan ffmpeg.FrameChu
 			// Concurrently process as many frames per second as we want
 			for j := 1; j <= ffmpeg.FPS; j++ {
 				wg.Add(1)
-				go func(wg *sync.WaitGroup, chunk *ffmpeg.FrameChunk, gen JuliaSetGenerator, index, frameIndex int) {
+				go func(wg *sync.WaitGroup, chunk *ffmpeg.FrameChunk, gen JuliaSetGenerator, index int) {
 					frameBuff := new(bytes.Buffer)
 					png.Encode(frameBuff, gen.CreateFrame(js.VideoWidth, js.VideoHeight))
 					chunk.Frames[index] = ffmpeg.Frame{
-						Index: index,
 						Frame: frameBuff.Bytes(),
 					}
 					wg.Done()
-				}(&wg, &chunk, *gen, j, j*i)
+				}(&wg, &chunk, *gen, j)
 
 				// increment the set (go forward in time)
 				gen.ConstantReal += js.StepSize
