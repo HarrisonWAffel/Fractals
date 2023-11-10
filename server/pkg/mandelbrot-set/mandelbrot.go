@@ -35,6 +35,12 @@ type MandelbrotGenerator struct {
 func (mg *MandelbrotGenerator) GenerateZoomVideo() chan ffmpeg.FrameChunk {
 	frameChan := make(chan ffmpeg.FrameChunk)
 	//30 second video
+	if mg.Zoom == 0 {
+		mg.Zoom = 0
+	}
+	if mg.Duration == 0 {
+		mg.Duration = 15
+	}
 	go func(gen *MandelbrotGenerator, frameChan chan ffmpeg.FrameChunk) {
 		videoLength := mg.Duration
 		workersPerChunk := 15

@@ -68,7 +68,7 @@ func StartServer() error {
 			MoveY:            output[1],
 			ZoomStepSize:     output[2],
 			Zoom:             output[3],
-			Duration:         int(output[4]),
+			Duration:         int(output[5]),
 			ImageWidth:       1000,
 			ConvergenceLimit: 255,
 		}
@@ -130,10 +130,7 @@ func getFloat64QueryParams(params []string, ctx *gin.Context) []float64 {
 		if v == "" {
 			output = append(output, 0.0)
 		}
-		out, err := strconv.ParseFloat(v, 64)
-		if err != nil {
-			fmt.Printf("err: %v\n", err)
-		}
+		out, _ := strconv.ParseFloat(v, 64)
 		output = append(output, out)
 	}
 	return output
