@@ -103,6 +103,8 @@ func (mg *MandelbrotGenerator) GenerateImageMultiPass(zoom float64) *image.RGBA 
 		}
 	}
 
+	// if the next four pixels above and below the current pixel
+	// are all the same color, use that color and don't compute the pixel
 	for y := 0; y < mg.ImageHeight; y = y + 2 {
 		rawImg[y] = make([]int, mg.ImageWidth)
 		for x := 0; x < mg.ImageWidth; x++ {
@@ -147,11 +149,6 @@ func (mg *MandelbrotGenerator) GenerateImageMultiPass(zoom float64) *image.RGBA 
 	}
 
 	return img
-}
-
-func getColorValue(c color.Color) uint32 {
-	r, g, b, a := c.RGBA()
-	return r + g + b + a
 }
 
 func (mg *MandelbrotGenerator) GenerateImage(zoom float64) *image.RGBA {

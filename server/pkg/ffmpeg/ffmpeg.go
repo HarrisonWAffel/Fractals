@@ -2,14 +2,11 @@ package ffmpeg
 
 import (
 	"bytes"
-	"fmt"
 	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"io"
 )
 
-type Processor struct {
-	TimeoutInSeconds int
-}
+type Processor struct{}
 
 type Frame struct {
 	Frame []byte
@@ -44,11 +41,11 @@ func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 	// resulting artifacts using this encoder of flags is very large
 	frameReader, frameWriter := io.Pipe()
 	go func(frameReader *io.PipeReader, frameOutputWriter *io.PipeWriter) {
-		ffmpeg.Input("pipe:").
+		err := ffmpeg.Input("pipe:").
 			WithInput(pr).
 			Output("pipe:", ffmpeg.KwArgs{
 				"c:v":     "libx264",
-				"crf":     "20",
+				"crf":     "28",
 				"preset":  "veryfast",
 				"pix_fmt": "yuv420p",
 				"f":       "ismv",
@@ -56,8 +53,10 @@ func (p *Processor) CreateVideo(frameChan chan FrameChunk) *io.PipeReader {
 			WithOutput(frameWriter, frameWriter).
 			ErrorToStdOut().
 			Run()
+		if err != nil {
+			panic(err)
+		}
 		frameWriter.Close()
-		fmt.Println("ffmpeg is done")
 	}(pr, frameWriter)
 
 	return frameReader
